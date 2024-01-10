@@ -1,11 +1,12 @@
 import { Catch, ExceptionFilter, ArgumentsHost } from '@nestjs/common';
 import { ZodError } from 'zod';
+import { Response } from 'express';
 
 @Catch(ZodError)
 export class ZodExceptionFilter<T extends ZodError> implements ExceptionFilter {
   catch(exception: T, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
-    const response = ctx.getResponse();
+    const response = ctx.getResponse<Response>();
     const status = 400;
 
     const formatedErrors: string[] = [];
@@ -16,7 +17,7 @@ export class ZodExceptionFilter<T extends ZodError> implements ExceptionFilter {
       );
     }
 
-    response.status(status).json({
+    return response.status(status).json({
       errors: formatedErrors,
       message: 'Validation Failed',
       statusCode: status,
