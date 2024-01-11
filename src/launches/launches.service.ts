@@ -2,13 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { Launch } from './launches.types';
 import { addNewLaunchDto } from './launches.dto';
 import { z } from 'zod';
+import { DbService } from '@src/db/db.service';
 
 @Injectable()
 export class LaunchesService {
   private launches = new Map<number, Launch>();
   private latestFlightNumber = 100;
 
-  constructor() {
+  constructor(private readonly dbService: DbService) {
     const launch: Launch = {
       flightNumber: 100,
       mission: 'Kepler Exploration X',
@@ -19,6 +20,12 @@ export class LaunchesService {
       upcoming: true,
       success: true,
     };
+
+    // dbService.db.select().from(planets).where(eq(planets.name, 'kpler'));
+
+    // dbService.db.query.customers.findMany({
+    //   where: (customers, { eq }) => eq(customers.name, 'jane'),
+    // });
 
     this.launches.set(launch.flightNumber, launch);
   }

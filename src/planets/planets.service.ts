@@ -2,13 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { parse } from 'csv-parse';
 import * as fs from 'fs';
 import * as path from 'path';
-import { Planet } from './planets.types';
+import { RawPlanet } from './planets.types';
+import { DbService } from '@src/db/db.service';
+import { NewPlanet, planets } from '@src/db/schema/planets';
 
 @Injectable()
 export class PlanetsService {
-  private habitablePlanets: Planet[] = [];
+  private habitablePlanets: NewPlanet[] = [];
 
-  constructor() {
+  constructor(private readonly dbService: DbService) {
     this.loadPlanetsData();
   }
 
@@ -16,11 +18,11 @@ export class PlanetsService {
     return this.habitablePlanets;
   }
 
-  isHabitablePlanet(planet: Planet) {
-    const isNotTooCold = Number(planet.koi_insol) > 0.36;
-    const isNotTooHot = Number(planet.koi_insol) < 1.11;
-    const isNotTooBig = Number(planet.koi_prad) < 1.6;
-    const isConfirmed = planet.koi_disposition === 'CONFIRMED';
+  isHabitablePlanet(planet: NewPlanet) {
+    const isNotTooCold = Number(planet.koiInsol) > 0.36;
+    const isNotTooHot = Number(planet.koiInsol) < 1.11;
+    const isNotTooBig = Number(planet.koiPrad) < 1.6;
+    const isConfirmed = planet.koiDisposition === 'CONFIRMED';
 
     return isNotTooCold && isNotTooHot && isNotTooBig && isConfirmed;
   }
@@ -36,9 +38,17 @@ export class PlanetsService {
     return new Promise((resolve, reject) => {
       fs.createReadStream(pathToFile)
         .pipe(parse({ comment: '#', columns: true }))
-        .on('data', (data: Planet) => {
-          if (this.isHabitablePlanet(data)) {
-            this.habitablePlanets.push(data);
+        .on('data', async (data: RawPlanet) => {
+          const newPlanet: NewPlanet = {
+            keplerName: data.kepler_name,
+            koiInsol: Number(data.koi_insol),
+            koiPrad: Number(data.koi_prad),
+            koiDisposition: data.koi_disposition,
+          };
+
+          if (this.isHabitablePlanet(newPlanet)) {
+            this.habitablePlanets.push(newPlanet);
+            await this.insertPlanet(newPlanet);
           }
         })
         .on('error', (err) => {
@@ -52,5 +62,12 @@ export class PlanetsService {
           resolve('done');
         });
     });
+  }
+
+  async insertPlanet(newPlanet: NewPlanet) {
+    return await this.dbService.db
+      .insert(planets)
+      .values(newPlanet)
+      .onConflictDoNothing({ target: planets.keplerName });
   }
 }
